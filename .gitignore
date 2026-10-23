@@ -1,0 +1,41 @@
+# --- Lab 3: lokalny klon biblioteki EPPlus (osobne repozytorium) ---
+lab3/EPPlus/
+
+# --- Pozostałości po naprawie repozytorium ---
+.git-broken/
+
+# --- Wyniki kompilacji .NET ---
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Ll]og/
+*.pdb
+*.ilk
+*.obj
+*.tlog
+*.lastbuildstate
+
+# --- Visual Studio / Rider / VS Code ---
+.vs/
+.idea/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.db
+*.opendb
+ipch/
+
+# --- NuGet ---
+packages/
+*.nupkg
+project.lock.json
+project.fragment.lock.json
+
+# --- Testy ---
+TestResults/
+[Tt]est[Rr]esult*/
