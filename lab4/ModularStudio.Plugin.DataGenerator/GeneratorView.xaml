@@ -1,0 +1,22 @@
+﻿<UserControl x:Class="ModularStudio.Plugin.DataGenerator.GeneratorView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <DockPanel Margin="10">
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,10,0,0">
+            <TextBlock Text="Liczba pomiarów:" VerticalAlignment="Center" />
+            <TextBox x:Name="TxtCount" Text="20" Width="50" Margin="5,0" />
+            <Button Content="Generuj losowe pomiary" Padding="8,3" Click="Generate_Click" />
+            <Button Content="Przekaż do analizy" Padding="8,3" Margin="10,0,0,0"
+                    FontWeight="Bold" Click="Publish_Click" />
+        </StackPanel>
+
+        <TextBlock DockPanel.Dock="Top" Text="Pomiary (oddzielone spacją lub średnikiem):" />
+        <TextBox x:Name="TxtNumbers" DockPanel.Dock="Top" Height="60" Margin="0,3,0,10"
+                 TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" />
+
+        <TextBlock DockPanel.Dock="Top" Text="Tekst analityczny / log:" />
+        <TextBox x:Name="TxtInput" Margin="0,3,0,0" AcceptsReturn="True"
+                 TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
+                 Text="INFO start systemu&#x0a;WARN wysoka temperatura&#x0a;ERROR utrata połączenia z czujnikiem" />
+    </DockPanel>
+</UserControl>

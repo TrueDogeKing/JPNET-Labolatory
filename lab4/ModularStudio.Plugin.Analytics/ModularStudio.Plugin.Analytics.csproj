@@ -1,11 +1,21 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-  <TargetFramework>net8.0-windows</TargetFramework>
-  <UseWPF>true</UseWPF>
-  <Nullable>enable</Nullable>
-  <ImplicitUsings>enable</ImplicitUsings>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
+
+  <PropertyGroup>
+    <HostPluginsDir>$(MSBuildProjectDirectory)\..\ModularStudio.Host\bin\$(Configuration)\$(TargetFramework)\Plugins\</HostPluginsDir>
+  </PropertyGroup>
+
+  <Target Name="CopyPluginToHostFolder" AfterTargets="Build">
+    <MakeDir Directories="$(HostPluginsDir)" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(HostPluginsDir)" />
+    <Message Importance="high" Text="[PostBuild] $(TargetFileName) -> $(HostPluginsDir)" />
+  </Target>
 
   <ItemGroup>
     <PackageReference Include="System.Composition" Version="10.0.14" />
