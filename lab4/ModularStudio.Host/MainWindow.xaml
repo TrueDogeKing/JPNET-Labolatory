@@ -1,12 +1,32 @@
 ﻿<Window x:Class="ModularStudio.Host.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:ModularStudio.Host"
-        mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
+        xmlns:xcad="clr-namespace:AvalonDock;assembly=AvalonDock"
+        xmlns:layout="clr-namespace:AvalonDock.Layout;assembly=AvalonDock"
+        Title="ModularStudio – Środowisko Analizy Tekstu i Telemetrii"
+        Height="650" Width="1100">
     <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="28" />
+        </Grid.RowDefinitions>
 
+        <xcad:DockingManager x:Name="DockManager" Grid.Row="0">
+            <layout:LayoutRoot>
+                <layout:LayoutPanel Orientation="Vertical">
+                    <layout:LayoutPanel Orientation="Horizontal">
+                        <layout:LayoutDocumentPane x:Name="DocumentsPane" />
+                        <layout:LayoutAnchorablePane x:Name="RightToolsPane" DockWidth="320" />
+                    </layout:LayoutPanel>
+                    <layout:LayoutAnchorablePane x:Name="BottomToolsPane" DockHeight="180" />
+                </layout:LayoutPanel>
+            </layout:LayoutRoot>
+        </xcad:DockingManager>
+
+        <StatusBar Grid.Row="1">
+            <StatusBarItem>
+                <TextBlock x:Name="TxtStatus" Text="Gotowy" />
+            </StatusBarItem>
+        </StatusBar>
     </Grid>
 </Window>
