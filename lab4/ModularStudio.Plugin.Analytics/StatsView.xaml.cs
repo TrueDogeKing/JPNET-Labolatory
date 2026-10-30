@@ -40,4 +40,13 @@ public partial class StatsView : UserControl
             .Select((v, i) => new BarItem($"#{i + 1}", v, maxAbs == 0 ? 0 : Math.Abs(v) / maxAbs * 100))
             .ToList();
     }
+
+    public void ShowAudit(AuditResult r)
+    {
+        TxtSession.Text = $"SessionId: {r.SessionId}\nStart: {r.StartedAt:HH:mm:ss.fff}";
+        TxtAuditSummary.Text =
+            (r.Anomalies.Count == 0 ? "Brak anomalii ✔" : $"Wykryto anomalii: {r.Anomalies.Count}") +
+            (r.SharedInScope ? "   (kontekst współdzielony w zakresie ✔)" : "   (BŁĄD: różne konteksty!)");
+        AnomaliesList.ItemsSource = r.Anomalies;
+    }
 }

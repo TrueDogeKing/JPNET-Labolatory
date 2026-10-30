@@ -14,6 +14,10 @@ public class AnalyticsPlugin : IPlugin, IDisposable
     private readonly IDisposable _subscription;
     private readonly StatsView _view = new();
 
+    [Import]
+    [SharingBoundary("AnalysisScope")]
+    public ExportFactory<BatchAuditor> AuditorFactory { get; set; } = null!;
+
     [ImportingConstructor]
     public AnalyticsPlugin(IEventAggregator eventBus, IHostContext host)
     {
@@ -27,10 +31,22 @@ public class AnalyticsPlugin : IPlugin, IDisposable
 
     private void OnDataReceived(DataPayloadPublishedEvent e)
     {
-        // zdarzenie może przyjść z dowolnego wątku, a UI zmieniamy tylko z wątku UI
-        _view.Dispatcher.Invoke(() => _view.ShowStats(e));
-        _host.LogMessage(PluginName, $"Przeliczono statystyki ({e.Measurements.Count} pomiarów)");
+        AuditResult result;
+
+        using (Export<BatchAuditor> scope = AuditorFactory.CreateExport())
+        {
+            result = scope.Value.Audit(e);
+
+            _view.Dispatcher.Invoke(() =>
+            {
+                _view.ShowStats(e);
+                _view.ShowAudit(result);
+            });
+
+            _host.LogMessage(PluginName,
+                $"Sesja {result.SessionId.ToString()[..8]}: anomalii {result.Anomalies.Count}");
+        }
     }
 
-    public void Dispose() => _subscription.Dispose(); // wypisanie z szyny (ważne w części 5)
+    public void Dispose() => _subscription.Dispose();
 }

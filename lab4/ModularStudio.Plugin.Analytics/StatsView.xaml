@@ -32,6 +32,10 @@
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
+            <TextBlock Text="Audyt (zakres AnalysisScope)" FontWeight="Bold" Margin="0,15,0,3" />
+            <TextBlock x:Name="TxtSession" TextWrapping="Wrap" />
+            <TextBlock x:Name="TxtAuditSummary" />
+            <ItemsControl x:Name="AnomaliesList" Margin="10,3,0,0" Foreground="DarkRed" />
         </StackPanel>
     </ScrollViewer>
 </UserControl>
