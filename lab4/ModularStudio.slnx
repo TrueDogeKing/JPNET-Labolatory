@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="ModularStudio.Contracts/ModularStudio.Contracts.csproj" />
+  <Project Path="ModularStudio.Host/ModularStudio.Host.csproj" />
+  <Project Path="ModularStudio.Plugin.Analytics/ModularStudio.Plugin.Analytics.csproj" />
+  <Project Path="ModularStudio.Plugin.DataGenerator/ModularStudio.Plugin.DataGenerator.csproj" />
+</Solution>
