@@ -32,6 +32,9 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="DataModel.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="LabCli.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

@@ -1,0 +1,222 @@
+#pragma once
+#include "RelayCommand.h"
+
+using namespace System;
+using namespace System::Collections::Generic;
+using namespace System::Collections::ObjectModel;
+using namespace System::ComponentModel;
+using namespace System::Reflection;
+using namespace System::Windows::Input;
+using namespace Microsoft::CodeAnalysis;
+using namespace Microsoft::CodeAnalysis::VisualBasic;
+using namespace Microsoft::CodeAnalysis::Emit;
+using namespace System::IO;
+using namespace System::Threading;
+
+#define NOTIFY_PROPERTY(type, name)                                   \
+    private: type _##name;                                            \
+    public: property type name {                                      \
+        type get() { return _##name; }                                \
+        void set(type value) { _##name = value; Notify(#name); }      \
+    }
+
+namespace LabCli {
+
+    public ref class DataModel : public INotifyPropertyChanged {
+    public:
+        virtual event PropertyChangedEventHandler^ PropertyChanged;
+
+    private:
+        void Notify(String^ name) {
+            PropertyChanged(this, gcnew PropertyChangedEventArgs(name));
+        }
+
+        static array<Object^>^ FillDefaults(MethodBase^ method, array<Object^>^ given) {
+            array<ParameterInfo^>^ ps = method->GetParameters();
+            array<Object^>^ args = gcnew array<Object^>(ps->Length);
+            for (int i = 0; i < ps->Length; i++) {
+                if (i < given->Length)
+                    args[i] = given[i];
+                else if (ps[i]->HasDefaultValue && ps[i]->DefaultValue != nullptr) {
+                    args[i] = ps[i]->DefaultValue;
+                    if (ps[i]->ParameterType->IsEnum)
+                        args[i] = Enum::ToObject(ps[i]->ParameterType, args[i]);
+                }
+                else
+                    args[i] = nullptr;   // null dla struktury = default(T)
+            }
+            return args;
+        }
+
+        NOTIFY_PROPERTY(String^, Code)
+        NOTIFY_PROPERTY(OutputKind, SelectedOutputKind)
+        NOTIFY_PROPERTY(int, SelectedMethodIndex)
+        NOTIFY_PROPERTY(String^, Parameter)
+        NOTIFY_PROPERTY(String^, Result)
+        NOTIFY_PROPERTY(String^, VariableType)
+        NOTIFY_PROPERTY(String^, VariableValue)
+
+    private:
+        int _selectedVariableIndex = -1;
+    public:
+        property int SelectedVariableIndex {
+            int get() { return _selectedVariableIndex; }
+            void set(int value) {
+                _selectedVariableIndex = value;
+                Notify("SelectedVariableIndex");
+                ShowSelectedVariable();
+            }
+        }
+
+        property ObservableCollection<OutputKind>^ OutputKinds;
+        property ObservableCollection<String^>^ Errors;
+        property ObservableCollection<String^>^ Methods;
+        property ObservableCollection<String^>^ Variables;
+
+        property ICommand^ CompileCommand;
+        property ICommand^ InvokeCommand;
+        property ICommand^ SetCommand;
+
+        DataModel() {
+            OutputKinds = gcnew ObservableCollection<OutputKind>();
+            for each (OutputKind k in Enum::GetValues(OutputKind::typeid))
+                OutputKinds->Add(k);
+            SelectedOutputKind = OutputKind::DynamicallyLinkedLibrary;
+
+            Errors = gcnew ObservableCollection<String^>();
+            Methods = gcnew ObservableCollection<String^>();
+            Variables = gcnew ObservableCollection<String^>();
+            SelectedMethodIndex = -1;
+
+            CompileCommand = gcnew RelayCommand(gcnew Action<Object^>(this, &DataModel::OnCompile));
+            InvokeCommand  = gcnew RelayCommand(gcnew Action<Object^>(this, &DataModel::OnInvoke));
+            SetCommand     = gcnew RelayCommand(gcnew Action<Object^>(this, &DataModel::OnSet));
+
+            Code = gcnew String(R"VB(Public Class Calculator
+            Private counter As Integer = 0
+            Public Factor As Double = 2.5
+            Public Property Name As String = "Calc"
+
+            Public Function Multiply(x As Double) As Double
+                counter += 1
+                Return x * Factor
+            End Function
+
+            Public Function Describe() As String
+                Return Name & ": called " & counter & " times"
+            End Function
+        End Class
+        )VB");
+        }
+
+    private:
+        Object^ _instance;
+        List<MethodInfo^>^ _methodInfos = gcnew List<MethodInfo^>();
+        List<MemberInfo^>^ _variableInfos = gcnew List<MemberInfo^>();
+
+        void OnCompile(Object^) {
+            Errors->Clear();
+            Methods->Clear();
+            Variables->Clear();
+            _methodInfos->Clear();
+            _variableInfos->Clear();
+            _instance = nullptr;
+            Result = nullptr;
+
+            try {
+                SyntaxTree^ tree = VisualBasicSyntaxTree::ParseText(
+                    Code, nullptr, "", nullptr, CancellationToken::None);
+                
+                List<MetadataReference^>^ refs = gcnew List<MetadataReference^>();
+                String^ tpa = safe_cast<String^>(AppContext::GetData("TRUSTED_PLATFORM_ASSEMBLIES"));
+                for each (String ^ path in tpa->Split(Path::PathSeparator)) {
+                    String^ name = Path::GetFileName(path);
+                    if (name->StartsWith("System.") || name->StartsWith("Microsoft.VisualBasic")
+                        || name->Equals("netstandard.dll") || name->Equals("mscorlib.dll")
+                        || name->Equals("System.dll"))
+                        refs->Add(MetadataReference::CreateFromFile(
+                            path, MetadataReferenceProperties::Assembly, nullptr));
+                }
+
+                ConstructorInfo^ ctor = nullptr;
+                for each (ConstructorInfo ^ c in VisualBasicCompilationOptions::typeid->GetConstructors()) {
+                    array<ParameterInfo^>^ ps = c->GetParameters();
+                    if (ps->Length > 1 && ps[0]->ParameterType == OutputKind::typeid && ps[1]->IsOptional) {
+                        ctor = c;
+                        break;
+                    }
+                }
+                VisualBasicCompilationOptions^ options = safe_cast<VisualBasicCompilationOptions^>(
+                    ctor->Invoke(FillDefaults(ctor, gcnew array<Object^>{ SelectedOutputKind })));
+
+                Compilation^ compilation = VisualBasicCompilation::Create(
+                    "DynamicAssembly", gcnew array<SyntaxTree^>{ tree }, refs, options);
+
+                MemoryStream^ ms = gcnew MemoryStream();
+                MethodInfo^ emit = nullptr;
+                for each (MethodInfo ^ m in Compilation::typeid->GetMethods()) {
+                    array<ParameterInfo^>^ ps = m->GetParameters();
+                    if (m->Name->Equals("Emit") && ps->Length > 1
+                        && ps[0]->ParameterType == Stream::typeid && ps[1]->IsOptional) {
+                        emit = m;
+                        break;
+                    }
+                }
+                EmitResult^ result = safe_cast<EmitResult^>(
+                    emit->Invoke(compilation, FillDefaults(emit, gcnew array<Object^>{ ms })));
+
+                if (!result->Success) {
+                    for each (Diagnostic ^ d in safe_cast<IEnumerable<Diagnostic^>^>(result->Diagnostics))
+                        if (d->Severity == DiagnosticSeverity::Error)
+                            Errors->Add(d->ToString());
+                    return;
+                }
+
+                Assembly^ assembly = Assembly::Load(ms->ToArray());
+                Type^ type = nullptr;
+                for each (Type ^ t in assembly->GetTypes())
+                    if (t->IsClass && t->IsPublic && !t->IsAbstract) {
+                        type = t;
+                        break;
+                    }
+                if (type == nullptr) {
+                    Errors->Add("Brak publicznej klasy w kodzie.");
+                    return;
+                }
+                _instance = Activator::CreateInstance(type);
+
+                FillMethods(type);    
+                FillVariables(type);   
+
+                Result = String::Format("Utworzono instancje: {0}", type->FullName); // tymczasowo, do testu
+            }
+            catch (Exception^ ex) {
+                Errors->Add(ex->ToString());
+            }
+        }
+
+        void FillMethods(Type^ type) {
+            // czesc 3 - uzupelnimy w nastepnym kroku
+        }
+
+        void FillVariables(Type^ type) {
+            // czesc 4 - uzupelnimy pozniej
+        }
+
+        void OnInvoke(Object^) {
+            Result = String::Format("INVOKE: metoda #{0}, parametr = {1}", SelectedMethodIndex, Parameter);
+        }
+
+        void OnSet(Object^) {
+            Result = String::Format("SET: zmienna #{0} = {1}", SelectedVariableIndex, VariableValue);
+        }
+
+        void ShowSelectedVariable() {
+            if (SelectedVariableIndex >= 0)
+                VariableType = "TODO: typ";
+            else
+                VariableType = nullptr;
+            VariableValue = nullptr;
+        }
+    };
+}
