@@ -3,10 +3,9 @@
 
 using namespace System::IO;
 using namespace System::Threading;
+using namespace System::Globalization;
 
 namespace LabCli {
-
-    // ================= Konstruktor =================
 
     DataModel::DataModel() {
         OutputKinds = gcnew ObservableCollection<OutputKind>();
@@ -43,8 +42,6 @@ End Class
 )VB");
     }
 
-    // ================= INotifyPropertyChanged =================
-
     void DataModel::Notify(String^ name) {
         PropertyChanged(this, gcnew PropertyChangedEventArgs(name));
     }
@@ -55,10 +52,6 @@ End Class
         ShowSelectedVariable();
     }
 
-    // ================= Pomocniki refleksji =================
-
-    // C++/CLI nie obsluguje parametrow opcjonalnych z C#.
-    // Dopelnia brakujace argumenty wartosciami domyslnymi, zeby wywolac metode/konstruktor refleksja.
     array<Object^>^ DataModel::FillDefaults(MethodBase^ method, array<Object^>^ given) {
         array<ParameterInfo^>^ ps = method->GetParameters();
         array<Object^>^ args = gcnew array<Object^>(ps->Length);
@@ -71,13 +64,11 @@ End Class
                     args[i] = Enum::ToObject(ps[i]->ParameterType, args[i]);
             }
             else
-                args[i] = nullptr;   // null dla struktury = default(T)
+                args[i] = nullptr;
         }
         return args;
     }
 
-    // Szuka publicznej metody o danej nazwie, ktorej 1. parametr ma podany typ,
-    // a wszystkie pozostale sa opcjonalne. Przy kilku pasujacych bierze te z najmniejsza liczba parametrow.
     MethodInfo^ DataModel::FindMethod(Type^ type, String^ name, Type^ firstParamType) {
         MethodInfo^ best = nullptr;
         for each (MethodInfo^ m in type->GetMethods()) {
@@ -94,10 +85,8 @@ End Class
         return best;
     }
 
-    // ================= Czesc 2: kompilacja Roslyn =================
 
     void DataModel::OnCompile(Object^) {
-        // 2.2: czyscimy wszystko przed nowa kompilacja
         Errors->Clear();
         Methods->Clear();
         Variables->Clear();
@@ -106,12 +95,8 @@ End Class
         _instance = nullptr;
         Result = nullptr;
 
-        // Wszystkie wywolania Roslyna ida przez refleksje, a obiekty trzymamy jako Object^.
-        // Dzieki temu cl.exe nie importuje sygnatur z System.Collections.Immutable (bledy importu metadanych).
         try {
-            // Typy Roslyna pobieramy po nazwie w runtime - w kodzie C++ nie moze pojawic sie
-            // zaden typ Roslyna (poza enumem OutputKind), bo cl.exe wywraca sie na ich metadanych.
-            Assembly^ caAsm = OutputKind::typeid->Assembly;   // Microsoft.CodeAnalysis.dll
+            Assembly^ caAsm = OutputKind::typeid->Assembly;
             Assembly^ vbAsm = Assembly::Load("Microsoft.CodeAnalysis.VisualBasic");
             Type^ tSyntaxTree        = caAsm->GetType("Microsoft.CodeAnalysis.SyntaxTree", true);
             Type^ tMetadataReference = caAsm->GetType("Microsoft.CodeAnalysis.MetadataReference", true);
@@ -120,11 +105,9 @@ End Class
             Type^ tVbCompilation     = vbAsm->GetType("Microsoft.CodeAnalysis.VisualBasic.VisualBasicCompilation", true);
             Type^ tVbOptions         = vbAsm->GetType("Microsoft.CodeAnalysis.VisualBasic.VisualBasicCompilationOptions", true);
 
-            // --- 2.1a: SyntaxTree (VisualBasicSyntaxTree.ParseText) ---
             MethodInfo^ parse = FindMethod(tVbSyntaxTree, "ParseText", String::typeid);
             Object^ tree = parse->Invoke(nullptr, FillDefaults(parse, gcnew array<Object^>{ Code }));
 
-            // --- 2.1b: referencje do metadanych (List<MetadataReference>) ---
             MethodInfo^ createRef = FindMethod(tMetadataReference, "CreateFromFile", String::typeid);
             Type^ refListType = List<Object^>::typeid->GetGenericTypeDefinition()
                                     ->MakeGenericType(tMetadataReference);
@@ -140,7 +123,6 @@ End Class
                     refs->Add(createRef->Invoke(nullptr, FillDefaults(createRef, gcnew array<Object^>{ path })));
             }
 
-            // --- 2.1c: VisualBasicCompilationOptions(OutputKind z ComboBoxa) ---
             ConstructorInfo^ ctor = nullptr;
             for each (ConstructorInfo^ c in tVbOptions->GetConstructors()) {
                 array<ParameterInfo^>^ ps = c->GetParameters();
@@ -151,19 +133,16 @@ End Class
             }
             Object^ options = ctor->Invoke(FillDefaults(ctor, gcnew array<Object^>{ SelectedOutputKind }));
 
-            // --- 2.1d: VisualBasicCompilation.Create(...) ---
             Array^ trees = Array::CreateInstance(tSyntaxTree, 1);
             trees->SetValue(tree, 0);
             MethodInfo^ create = FindMethod(tVbCompilation, "Create", String::typeid);
             Object^ compilation = create->Invoke(nullptr, FillDefaults(create,
                 gcnew array<Object^>{ gcnew String("DynamicAssembly"), trees, refs, options }));
 
-            // --- 2.1e: Emit do MemoryStream ---
             MemoryStream^ ms = gcnew MemoryStream();
             MethodInfo^ emit = FindMethod(tCompilation, "Emit", Stream::typeid);
             Object^ result = emit->Invoke(compilation, FillDefaults(emit, gcnew array<Object^>{ ms }));
 
-            // --- 2.2: bledy -> Errors (Success i Diagnostics czytane refleksja) ---
             bool success = safe_cast<bool>(result->GetType()->GetProperty("Success")->GetValue(result));
             if (!success) {
                 Object^ diags = result->GetType()->GetProperty("Diagnostics")->GetValue(result);
@@ -175,7 +154,6 @@ End Class
                 return;
             }
 
-            // --- 2.2: sukces -> ladujemy zestaw i tworzymy instancje ---
             Assembly^ assembly = Assembly::Load(ms->ToArray());
             Type^ type = nullptr;
             for each (Type^ t in assembly->GetTypes())
@@ -189,10 +167,8 @@ End Class
             }
             _instance = Activator::CreateInstance(type);
 
-            FillMethods(type);     // czesc 3
-            FillVariables(type);   // czesc 4
-
-            Result = String::Format("Utworzono instancje: {0}", type->FullName); // tymczasowo, do testu
+            FillMethods(type);
+            FillVariables(type);
         }
         catch (TargetInvocationException^ ex) {
             Errors->Add(ex->InnerException != nullptr ? ex->InnerException->ToString() : ex->ToString());
@@ -202,31 +178,123 @@ End Class
         }
     }
 
-    // ================= Czesc 3: metody =================
+    Object^ DataModel::ConvertTo(String^ text, Type^ targetType) {
+        if (targetType == String::typeid)
+            return text;
+        if (targetType->IsEnum)
+            return Enum::Parse(targetType, text);
+        return Convert::ChangeType(text, targetType, CultureInfo::CurrentCulture);
+    }
 
     void DataModel::FillMethods(Type^ type) {
-        // czesc 3 - uzupelnimy w nastepnym kroku
+        BindingFlags flags = BindingFlags::Public | BindingFlags::NonPublic
+                           | BindingFlags::Instance | BindingFlags::Static
+                           | BindingFlags::DeclaredOnly;
+        for each (MethodInfo^ m in type->GetMethods(flags)) {
+            if (m->IsSpecialName) 
+                continue;
+            _methodInfos->Add(m);
+            Methods->Add(m->ToString());
+        }
     }
 
     void DataModel::OnInvoke(Object^) {
-        Result = String::Format("INVOKE: metoda #{0}, parametr = {1}", SelectedMethodIndex, Parameter);
+        if (_instance == nullptr || SelectedMethodIndex < 0 || SelectedMethodIndex >= _methodInfos->Count) {
+            Result = "Najpierw skompiluj kod i zaznacz metode.";
+            return;
+        }
+        MethodInfo^ m = _methodInfos[SelectedMethodIndex];
+        array<ParameterInfo^>^ ps = m->GetParameters();
+        if (ps->Length > 1) {
+            Result = "Obslugiwane sa tylko metody z 0 lub 1 parametrem.";
+            return;
+        }
+        try {
+            array<Object^>^ args = nullptr;
+            if (ps->Length == 1)
+                args = gcnew array<Object^>{ ConvertTo(Parameter, ps[0]->ParameterType) };
+
+            Object^ r = m->Invoke(m->IsStatic ? nullptr : _instance, args);
+
+            if (m->ReturnType == Void::typeid)
+                Result = "(void)";
+            else if (r == nullptr)
+                Result = "null";
+            else
+                Result = r->ToString();
+        }
+        catch (TargetInvocationException^ ex) {
+            Result = String::Format("Wyjatek w metodzie: {0}", ex->InnerException->Message);
+        }
+        catch (Exception^ ex) {
+            Result = String::Format("Blad: {0}", ex->Message);
+        }
     }
 
-    // ================= Czesc 4: pola i wlasciwosci =================
-
     void DataModel::FillVariables(Type^ type) {
-        // czesc 4 - uzupelnimy pozniej
+        BindingFlags flags = BindingFlags::Public | BindingFlags::NonPublic
+                           | BindingFlags::Instance | BindingFlags::Static
+                           | BindingFlags::DeclaredOnly;
+        for each (FieldInfo^ f in type->GetFields(flags)) {
+            _variableInfos->Add(f);
+            Variables->Add(String::Format("[field] {0}", f->Name));
+        }
+        for each (PropertyInfo^ p in type->GetProperties(flags)) {
+            _variableInfos->Add(p);
+            Variables->Add(String::Format("[property] {0}", p->Name));
+        }
     }
 
     void DataModel::ShowSelectedVariable() {
-        if (SelectedVariableIndex >= 0)
-            VariableType = "TODO: typ";
-        else
+        int idx = SelectedVariableIndex;
+        if (_instance == nullptr || idx < 0 || idx >= _variableInfos->Count) {
             VariableType = nullptr;
-        VariableValue = nullptr;
+            VariableValue = nullptr;
+            return;
+        }
+        MemberInfo^ mi = _variableInfos[idx];
+
+        FieldInfo^ f = dynamic_cast<FieldInfo^>(mi);
+        if (f != nullptr) {
+            VariableType = f->FieldType->FullName;
+            VariableValue = Convert::ToString(f->GetValue(_instance));
+            return;
+        }
+        PropertyInfo^ p = dynamic_cast<PropertyInfo^>(mi);
+        if (p != nullptr) {
+            VariableType = p->PropertyType->FullName;
+            VariableValue = p->CanRead ? Convert::ToString(p->GetValue(_instance)) : nullptr;
+        }
     }
 
     void DataModel::OnSet(Object^) {
-        Result = String::Format("SET: zmienna #{0} = {1}", SelectedVariableIndex, VariableValue);
+        int idx = SelectedVariableIndex;
+        if (_instance == nullptr || idx < 0 || idx >= _variableInfos->Count) {
+            Result = "Najpierw skompiluj kod i zaznacz zmienna.";
+            return;
+        }
+        MemberInfo^ mi = _variableInfos[idx];
+        try {
+            FieldInfo^ f = dynamic_cast<FieldInfo^>(mi);
+            if (f != nullptr) {
+                if (f->IsLiteral || f->IsInitOnly) {
+                    Result = "To pole jest stala/ReadOnly - nie mozna go zmienic.";
+                    return;
+                }
+                f->SetValue(_instance, ConvertTo(VariableValue, f->FieldType));
+            }
+            PropertyInfo^ p = dynamic_cast<PropertyInfo^>(mi);
+            if (p != nullptr) {
+                if (!p->CanWrite) {
+                    Result = "Ta wlasciwosc nie ma settera.";
+                    return;
+                }
+                p->SetValue(_instance, ConvertTo(VariableValue, p->PropertyType));
+            }
+            ShowSelectedVariable();   // odswiez wartosc odczytana z obiektu
+        }
+        catch (Exception^ ex) {
+            Result = String::Format("Blad SET: {0}", ex->Message);
+        }
     }
 }

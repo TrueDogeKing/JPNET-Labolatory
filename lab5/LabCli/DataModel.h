@@ -64,6 +64,7 @@ namespace LabCli {
         // ---------- Pomocniki refleksji ----------
         static array<Object^>^ FillDefaults(MethodBase^ method, array<Object^>^ given);
         static MethodInfo^ FindMethod(Type^ type, String^ name, Type^ firstParamType);
+        static Object^ ConvertTo(String^ text, Type^ targetType);
 
         // ---------- Komendy i logika ----------
         void OnCompile(Object^);
