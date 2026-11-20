@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+  </PropertyGroup>
+
+  <!-- W F# KOLEJNOŚĆ PLIKÓW MA ZNACZENIE: każdy plik widzi tylko to, co jest nad nim -->
+  <ItemGroup>
+    <Compile Include="Domain.fs" />
+    <Compile Include="Builders.fs" />
+    <Compile Include="Data.fs" />
+    <Compile Include="Currencies.fs" />
+    <Compile Include="Library.fsi" />
+    <Compile Include="Library.fs" />
+  </ItemGroup>
+
+</Project>

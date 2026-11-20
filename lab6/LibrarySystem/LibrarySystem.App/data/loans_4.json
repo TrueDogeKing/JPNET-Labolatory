@@ -1,0 +1,5 @@
+[
+  { "loanId": 1, "title": "Dziady",   "loanDate": "2025-01-10", "returnDate": "2025-01-20" },
+  { "loanId": 2, "title": "Ferdydurke", "loanDate": "2025-07-15", "returnDate": "2025-08-02" },
+  { "loanId": 3, "title": "Solaris",  "loanDate": "2026-03-01", "returnDate": "2026-03-15" }
+]

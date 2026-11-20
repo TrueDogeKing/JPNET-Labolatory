@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="LibrarySystem.App/LibrarySystem.App.fsproj" />
+  <Project Path="LibrarySystem.Core/LibrarySystem.Core.fsproj" />
+</Solution>

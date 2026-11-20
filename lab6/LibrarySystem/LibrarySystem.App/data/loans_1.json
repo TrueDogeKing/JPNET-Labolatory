@@ -1,0 +1,6 @@
+[
+  { "loanId": 1, "title": "Pan Tadeusz",        "loanDate": "2024-02-10", "returnDate": "2024-02-24" },
+  { "loanId": 2, "title": "Lalka",              "loanDate": "2025-05-03", "returnDate": "2025-05-30" },
+  { "loanId": 3, "title": "Wiedźmin",           "loanDate": "2026-09-12", "returnDate": "2026-10-01" },
+  { "loanId": 4, "title": "F# for Fun and Profit", "loanDate": "2026-11-05", "returnDate": null }
+]
